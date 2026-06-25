@@ -21,15 +21,15 @@ from ais import functions as af
 # Bisa di-override via environment variable untuk backfill
 START_DATE = datetime.fromisoformat(
     os.environ.get("PIPELINE_START_DATE",
-                   (datetime.now() - timedelta(days=8)).strftime("%Y-%m-%d"))
+                   (datetime.now() - timedelta(days=9)).strftime("%Y-%m-%d"))
 )
 END_DATE = datetime.fromisoformat(
     os.environ.get("PIPELINE_END_DATE",
-                   (datetime.now() - timedelta(days=1)).strftime("%Y-%m-%d"))
+                   (datetime.now() - timedelta(days=3)).strftime("%Y-%m-%d"))
 )
 
 working_dir   = os.environ["AWS_WORKING_DIRECTORY_PATH"]
-SAVE_PATH     = f"s3a://{working_dir}/iran_usa_conflict/"
+SAVE_PATH     = f"s3a://{working_dir}iran_usa_conflict/"
 H3_RESOLUTION = 5
 
 print(f"Periode: {START_DATE.date()} s/d {END_DATE.date()}")
@@ -88,7 +88,7 @@ print(f"Total baris data AIS: {row_count:,}")
 
 start_str = START_DATE.strftime("%d%b%Y").lower()
 end_str   = END_DATE.strftime("%d%b%Y").lower()
-out_path  = f"{SAVE_PATH}/data-ais-indonesia-{start_str}-{end_str}.parquet"
+out_path  = f"{SAVE_PATH}data-ais-indonesia-by-mmsi-{start_str}-{end_str}.parquet"
 
 print(f"Menyimpan ke {out_path}...")
 (

@@ -5,7 +5,9 @@ Preprocessing data AIS mentah:
   2. Deduplikasi (distinct)
   3. Join IHS ship register (af.match_ais_ihs)
   4. Manual fix vessel_type untuk kapal tertentu
-  5. Simpan data clean ke S3 personal
+  5. Simpan data clean detail ke S3 personal
+  6. Concat data dengan periode sebelumnya
+  7. Simpan data concat ke S3 personal
 """
 
 import os
@@ -27,12 +29,12 @@ END_DATE = datetime.fromisoformat(
 )
 
 working_dir = os.environ["AWS_WORKING_DIRECTORY_PATH"]
-SAVE_PATH   = f"s3a://{working_dir}/iran_usa_conflict/"
+SAVE_PATH   = f"s3a://{working_dir}iran_usa_conflict/"
 
 start_str = START_DATE.strftime("%d%b%Y").lower()
 end_str   = END_DATE.strftime("%d%b%Y").lower()
-IN_PATH   = f"{SAVE_PATH}/raw/data-ais-indonesia-{start_str}-{end_str}.parquet"
-OUT_PATH  = f"{SAVE_PATH}/clean/data-ais-indonesia-clean-{start_str}-{end_str}.parquet"
+IN_PATH   = f"{SAVE_PATH}data-ais-indonesia-by-mmsi-{start_str}-{end_str}.parquet"
+OUT_PATH  = f"{SAVE_PATH}data-ais-indonesia-by-mmsi-detail-{start_str}-{end_str}.parquet"
 
 # Manual fix: kapal yang vessel_type-nya salah di register
 VESSEL_TYPE_FIXES = [
@@ -84,9 +86,20 @@ for vessel_name, type_main, type_sub in VESSEL_TYPE_FIXES:
              .otherwise(F.col("vessel_type_sub"))
         )
 
-# ── Step 5: Simpan data clean ─────────────────────────────────────────────────
+# ── Step 5: Simpan data clean detail ─────────────────────────────────────────────────
 
 print(f"Menyimpan ke {OUT_PATH}...")
+(
+    data_ais
+    .write
+    .mode("overwrite")
+    .parquet(OUT_PATH)
+)
+print(f"Menyimpan data seminggu terakhir selesai. Total baris: {data_ais.count():,}")
+
+# ── Step 6: Concat data seminggu terakhir dengan data periode sebelumnya ─────────────────────────────────────────────────
+
+print(f"Concat data seminggu terakhir dengan data periode sebelumnya...")
 (
     data_ais
     .write
