@@ -88,7 +88,7 @@ print(f"Total baris data AIS: {row_count:,}")
 
 start_str = START_DATE.strftime("%d%b%Y").lower()
 end_str   = END_DATE.strftime("%d%b%Y").lower()
-out_path  = f"{SAVE_PATH}/raw/data-ais-indonesia-{start_str}-{end_str}.parquet"
+out_path  = f"{SAVE_PATH}/data-ais-indonesia-{start_str}-{end_str}.parquet"
 
 print(f"Menyimpan ke {out_path}...")
 (
