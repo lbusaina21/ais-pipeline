@@ -5,7 +5,7 @@
 
 set -euo pipefail
 
-REPO_URL="https://github.com/lbusaina21/AIS.git"
+REPO_URL="https://github.com/lbusaina21/ais-pipeline.git"
 BRANCH="main"
 WORK_DIR="/home/onyxia/work"
 ONYXIA_API="https://datalab.officialstatistics.org"
