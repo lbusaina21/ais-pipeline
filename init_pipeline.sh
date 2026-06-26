@@ -78,6 +78,10 @@ pip install -q rapidfuzz h3==3.7.7 geodatasets pyodbc sqlalchemy
 log "Dependencies selesai."
 
 # ── 3. Jalankan pipeline ──────────────────────────────────────────────────────
+
+# Konfigurasi akumulatif
+export PIPELINE_ACCUM_START="okt2025"
+
 log "--- Mulai: 00_ingest.py ---"
 python pipeline/00_ingest.py 2>&1 | tee -a "$LOG_FILE"
 log "--- Selesai: 00_ingest.py ---"
