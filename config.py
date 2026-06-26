@@ -43,16 +43,23 @@ OUT_DETAIL = f"{SAVE_PATH}data-ais-indonesia-by-mmsi-detail-{start_str}-{end_str
 
 # Akumulatif
 ACCUM_START   = os.environ.get("PIPELINE_ACCUM_START", start_str)
-PREV_ACCUM   = f"{SAVE_PATH}data-ais-indonesia-by-mmsi-detail-{ACCUM_START}-{end_accum_str}.parquet"
+PREV_ACCUM    = f"{SAVE_PATH}data-ais-indonesia-by-mmsi-detail-{ACCUM_START}-{end_accum_str}.parquet"
 OUT_ACCUM     = f"{SAVE_PATH}data-ais-indonesia-by-mmsi-detail-{ACCUM_START}-{end_str}.parquet"
 
 # Hasil analisis
-OUT_PORT_TRAFFIC  = f"{SAVE_PATH}hasil/port_traffic_{ACCUM_START}_{end_str}.parquet"
-OUT_PORT_CALL     = f"{SAVE_PATH}hasil/port_call_{ACCUM_START}_{end_str}.parquet"
-OUT_TIME_TRAVEL   = f"{SAVE_PATH}hasil/time_travel_hormuz_{ACCUM_START}_{end_str}.parquet"
+OUT_TRAFFIC_ALL         = f"{SAVE_PATH}hasil/port_traffic_all_{ACCUM_START}_{end_str}.parquet"
+OUT_TRAFFIC_INBOUND     = f"{SAVE_PATH}hasil/port_traffic_inbound_{ACCUM_START}_{end_str}.parquet"
+OUT_TRAFFIC_OUTBOUND    = f"{SAVE_PATH}hasil/port_traffic_outbound_{ACCUM_START}_{end_str}.parquet"
+OUT_HORMUZ_TAG          = f"{SAVE_PATH}hasil/tagging-vessel-hormuz-{ACCUM_START}-{end_str}.parquet"
+OUT_VESSEL_HORMUZ       = f"{SAVE_PATH}hasil/vessel_through_hormuz_{ACCUM_START}_{end_str}.parquet"
+OUT_VESSEL_NO_HORMUZ    = f"{SAVE_PATH}hasil/vessel_not_through_hormuz_{ACCUM_START}_{end_str}.parquet"
+OUT_ARRIVAL_RECAP       = f"{SAVE_PATH}hasil/arrival_recap_hormuz_{ACCUM_START}_{end_str}.parquet"
+OUT_TIME_TRAVEL         = f"{SAVE_PATH}hasil/time-travel-hormuz-to-indonesia-{start_str}-{end_str}.parquet"
 
 # Referensi statis
-# REF_PORT      = f"{SAVE_PATH}ref/port_indonesia_manual.parquet"
+REF_EEZ_LAND       = f"/vsicurl/https://github.com/nandyarz/ais/raw/main/land-eez/EEZ_Land_v3_202030.shp"
+REF_PORT_INDO      = f"{SAVE_PATH}port_indonesia_manual.parquet"
+REF_PORT_LN        = f"{SAVE_PATH}port_ln.parquet"
 
 # ── Konstanta ─────────────────────────────────────────────────────────────────
 
@@ -81,6 +88,20 @@ SELECT_COLS = [
     "GrossTonnage", "NetTonnage", "Deadweight", "LightDisplacementTonnage",
     "nav_status", "heading", "sog",
     "dt_pos_utc", "latitude", "longitude", "H3_int_index_8",
+]
+
+# Polygon Hormuz
+REF_POLYGON_HORMUZ = [
+    [54.7, 24.9], [54.7, 26.0], [54.9, 26.6],
+    [55.5, 27.0], [56.5, 27.2], [56.5, 26.5],
+    [56.1, 26.1], [55.7, 25.7], [54.7, 24.9],
+]
+
+# Missing Column
+MISSING_COLS = [
+    "imo", "length", "width", "LengthOverallLOA",
+    "BreadthExtreme", "GrossTonnage", "NetTonnage", "Deadweight",
+    "LightDisplacementTonnage", "Depth", "dt_pos_utc",
 ]
 
 # SQL Server BPS

@@ -22,7 +22,6 @@ from pyspark.sql.functions import col, count
 from ais import functions as af
 
 from config import (
-    START_DATE, END_DATE, SAVE_PATH,
     IN_RAW, OUT_DETAIL, OUT_ACCUM, PREV_ACCUM,
     VESSEL_TYPE_FIXES, SELECT_COLS,
 )

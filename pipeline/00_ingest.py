@@ -15,7 +15,7 @@ import geopandas as gpd
 from pyspark.sql import SparkSession
 from ais import functions as af
 
-from config import START_DATE, END_DATE, SAVE_PATH, IN_RAW, H3_RESOLUTION_EEZ
+from config import START_DATE, END_DATE, IN_RAW, REF_EEZ_LAND, H3_RESOLUTION_EEZ
 
 # ── Spark session ─────────────────────────────────────────────────────────────
 
@@ -27,9 +27,7 @@ print(f"Output: {IN_RAW}")
 # ── Step 1: Polyfill H3 pada EEZ Indonesia ───────────────────────────────────
 
 print("Membaca EEZ Indonesia...")
-land_eez = gpd.read_file(
-    "/vsicurl/https://github.com/nandyarz/ais/raw/main/land-eez/EEZ_Land_v3_202030.shp"
-)
+land_eez = gpd.read_file(REF_EEZ_LAND)
 indo_eez = land_eez[land_eez["TERRITORY1"] == "Indonesia"]
 
 print(f"Polyfill H3 resolusi {H3_RESOLUTION_EEZ}...")

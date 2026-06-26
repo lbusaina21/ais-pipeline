@@ -1,142 +1,167 @@
 """
 pipeline/04_time_travel.py
-Analisis Time Travel — kapal Indonesia yang melewati Selat Hormuz:
-  1. Baca data AIS clean
-  2. Filter kapal yang melewati polygon Selat Hormuz (via H3)
-  3. Hitung waktu perjalanan (time travel) per kapal
-  4. Simpan hasil ke S3 personal
+Analisis Time Travel — Selat Hormuz ke Indonesia:
+  1. Baca data AIS clean (akumulatif)
+  2. Load EEZ Indonesia + polyfill H3 res-8
+  3. Polyfill H3 Selat Hormuz res-8
+  4. Tag tiap sinyal: is_hormuz, is_indo
+  5. Drop kolom tidak perlu
+  6. Detect exit Hormuz & entry Indonesia per kapal
+  7. Hitung travel time (exit Hormuz → entry Indo)
+  8. Join metadata kapal → simpan hasil
 """
 
-import os
-from datetime import datetime, timedelta
+import sys
+sys.path.append("/home/onyxia/work/ais-pipeline")
 
 import h3
 import geopandas as gpd
-from shapely.geometry import Polygon
+from shapely.geometry import Polygon, mapping
 import pyspark.sql.functions as F
 from pyspark.sql import SparkSession
 from pyspark.sql.window import Window
-from ais import functions as af
-
-# ── Konfigurasi ───────────────────────────────────────────────────────────────
-
-START_DATE = datetime.fromisoformat(
-    os.environ.get("PIPELINE_START_DATE",
-                   (datetime.now() - timedelta(days=8)).strftime("%Y-%m-%d"))
-)
-END_DATE = datetime.fromisoformat(
-    os.environ.get("PIPELINE_END_DATE",
-                   (datetime.now() - timedelta(days=1)).strftime("%Y-%m-%d"))
+from pyspark.sql.functions import (
+    col, lag, broadcast,
+    min as spark_min,
+    max as spark_max,
 )
 
-working_dir = os.environ["AWS_WORKING_DIRECTORY_PATH"]
-SAVE_PATH   = f"s3a://{working_dir}/iran_usa_conflict/"
+from config import OUT_ACCUM, REF_POLYGON_HORMUZ, REF_EEZ_LAND, OUT_TIME_TRAVEL
 
-start_str = START_DATE.strftime("%d%b%Y").lower()
-end_str   = END_DATE.strftime("%d%b%Y").lower()
-IN_PATH   = f"{SAVE_PATH}/clean/data-ais-indonesia-clean-{start_str}-{end_str}.parquet"
-OUT_PATH  = f"{SAVE_PATH}/hasil/time_travel_hormuz_{start_str}_{end_str}.parquet"
+POLYGON_HORMUZ = Polygon(REF_POLYGON_HORMUZ)
 
-H3_RESOLUTION = 8
+COLS_DROP_1 = [
+    "H3_int_index_8", "nav_status",
+    "GroupBeneficialOwnerCountryofDomicile",
+    "GroupBeneficialOwnerCountryOfRegistration",
+    "RegisteredOwnerCountryofDomicile",
+]
+COLS_DROP_2 = ["latitude", "longitude", "sog", "vessel_name"]
+COLS_DROP_3 = ["imo"]
 
-# Polygon Selat Hormuz
-POLYGON_HORMUZ = Polygon([
-    [54.7, 24.9], [54.7, 26.0], [54.9, 26.6],
-    [55.5, 27.0], [56.5, 27.2], [56.5, 26.5],
-    [56.1, 26.1], [55.7, 25.7], [54.7, 24.9],
-])
+def polygon_to_h3(polygon, res=8):
+    return h3.polyfill(
+        polygon.__geo_interface__,
+        res=res,
+        geo_json_conformant=True,
+    )
 
 # ── Spark session ─────────────────────────────────────────────────────────────
 
 spark = SparkSession.builder.getOrCreate()
 
-# ── Step 1: H3 polyfill Selat Hormuz ─────────────────────────────────────────
+# ── Step 1: Baca AIS clean akumulatif ────────────────────────────────────────
 
-print("Polyfill H3 Selat Hormuz...")
-gdf_hormuz = gpd.GeoDataFrame(
-    {"name": ["Hormuz"]}, geometry=[POLYGON_HORMUZ], crs="EPSG:4326"
+print(f"Membaca {OUT_ACCUM}...")
+df_ais = spark.read.parquet(OUT_ACCUM)
+
+# ── Step 2: Polyfill H3 EEZ Indonesia ────────────────────────────────────────
+
+print("Membaca EEZ Indonesia...")
+land_eez  = gpd.read_file(REF_EEZ_LAND)
+indo_eez  = land_eez[land_eez["TERRITORY1"] == "Indonesia"]
+indo_geom = indo_eez.unary_union
+
+print("Polyfill H3 res=8 EEZ Indonesia...")
+h3_set_indo = {h3.string_to_h3(x) for x in polygon_to_h3(indo_geom, 8)}
+print(f"Indo   res=8: {len(h3_set_indo):,} cells")
+
+# ── Step 3: Polyfill H3 Selat Hormuz ─────────────────────────────────────────
+
+h3_set_hormuz = {h3.string_to_h3(x) for x in polygon_to_h3(POLYGON_HORMUZ, 8)}
+print(f"Hormuz res=8: {len(h3_set_hormuz):,} cells")
+
+# ── Step 4: Tag sinyal is_hormuz & is_indo ───────────────────────────────────
+
+print("Tagging sinyal...")
+h3_indo_df = (
+    spark.createDataFrame([(int(x),) for x in h3_set_indo], ["H3_int_index_8"])
+    .withColumn("is_indo", F.lit(True))
+)
+h3_hormuz_df = (
+    spark.createDataFrame([(int(x),) for x in h3_set_hormuz], ["H3_int_index_8"])
+    .withColumn("is_hormuz", F.lit(True))
 )
 
-h3_hormuz_int = []
-for _, row in gdf_hormuz.iterrows():
-    geom  = row.geometry.__geo_interface__
-    cells = h3.polyfill(geom, H3_RESOLUTION, geo_json_conformant=True)
-    h3_hormuz_int.extend([h3.string_to_h3(c) for c in cells])
-
-h3_hormuz_int = list(set(h3_hormuz_int))
-print(f"H3 cells Hormuz: {len(h3_hormuz_int)}")
-
-# ── Step 2: Baca AIS clean ────────────────────────────────────────────────────
-
-print(f"Membaca {IN_PATH}...")
-df_ais = spark.read.parquet(IN_PATH)
-
-# ── Step 3: Filter kapal yang lewat Hormuz ────────────────────────────────────
-
-print("Filter kapal yang melewati Selat Hormuz...")
-df_through_hormuz = af.apply_small_filter(
-    spark, df_ais, h3_hormuz_int, "H3_int_index_8"
-)
-mmsi_through_hormuz = (
-    df_through_hormuz.select("mmsi").distinct().collect()
-)
-mmsi_list = [row["mmsi"] for row in mmsi_through_hormuz]
-print(f"Kapal yang melewati Hormuz: {len(mmsi_list):,}")
-
-# ── Step 4: Ambil seluruh track kapal tersebut ────────────────────────────────
-
-print("Ambil seluruh track kapal via broadcast join...")
-df_filtered = af.apply_small_filter(spark, df_ais, mmsi_list, "mmsi")
-
-# ── Step 5: Assign route berdasarkan area ─────────────────────────────────────
-
-# Buat label area: "Hormuz" atau None
-hormuz_df = spark.createDataFrame(
-    [{"boundary_h3": c, "area_name": "Selat Hormuz"} for c in h3_hormuz_int]
+df = (
+    df_ais
+    .join(broadcast(h3_hormuz_df), "H3_int_index_8", "left")
+    .join(broadcast(h3_indo_df),   "H3_int_index_8", "left")
+    .withColumn("is_hormuz", F.coalesce(col("is_hormuz"), F.lit(False)))
+    .withColumn("is_indo",   F.coalesce(col("is_indo"),   F.lit(False)))
 )
 
-df_labeled = df_filtered.join(
-    F.broadcast(hormuz_df),
-    df_filtered["H3_int_index_8"] == hormuz_df["boundary_h3"],
-    how="left",
-).withColumn(
-    "polygon_name",
-    F.coalesce(F.col("area_name"), F.lit("Laut Lepas"))
+# ── Step 5: Drop kolom tidak perlu ───────────────────────────────────────────
+
+df = df.drop(*COLS_DROP_1).drop(*COLS_DROP_2).drop(*COLS_DROP_3)
+
+# ── Step 6: Detect exit Hormuz & entry Indonesia ──────────────────────────────
+
+print("Detect exit Hormuz & entry Indonesia...")
+w = Window.partitionBy("mmsi").orderBy("dt_pos_utc")
+
+df_detect = (
+    df
+    .withColumn(
+        "hormuz_exit",
+        (lag("is_hormuz").over(w) == True) & (col("is_hormuz") == False)
+    )
+    .withColumn(
+        "indo_entry",
+        (lag("is_indo").over(w) == False) & (col("is_indo") == True)
+    )
 )
 
-df_routed = af.assign_route(
-    df_labeled,
-    ship_unique_identifier_cols=["mmsi"],
-    route_order_by_cols=["dt_pos_utc"],
+# Entry Indo: ambil timestamp pertama masuk Indonesia
+indo_entry_time = (
+    df_detect
+    .filter("indo_entry")
+    .groupBy("mmsi")
+    .agg(spark_min("dt_pos_utc").alias("t_indo"))
 )
 
-# ── Step 6: Hitung time travel ────────────────────────────────────────────────
+# Exit Hormuz: ambil exit terakhir sebelum masuk Indo
+df_join = df_detect.join(indo_entry_time, "mmsi")
 
-print("Hitung waktu perjalanan...")
-df_agg = af.agg_route(
-    df_routed,
-    group_by_cols=["mmsi", "route_group", "polygon_name", "vessel_type_main"],
-    order_by_cols=["dt_pos_utc"],
-    num_agg_cols=["sog"],
-    fl_agg_cols=["dt_pos_utc", "vessel_name", "destination"],
-    checker=False,
+hormuz_exit_time = (
+    df_join
+    .filter(col("hormuz_exit") & (col("dt_pos_utc") < col("t_indo")))
+    .groupBy("mmsi")
+    .agg(spark_max("dt_pos_utc").alias("t_hormuz"))
 )
 
-# Durasi tiap segmen dalam jam
-df_agg = df_agg.withColumn(
-    "durasi_jam",
-    (
-        F.unix_timestamp("departure_dt_pos_utc") -
-        F.unix_timestamp("arrival_dt_pos_utc")
-    ) / 3600,
+# ── Step 7: Hitung travel time ────────────────────────────────────────────────
+
+print("Hitung travel time...")
+result = (
+    hormuz_exit_time
+    .join(indo_entry_time, "mmsi")
+    .filter(col("t_indo") > col("t_hormuz"))
+    .withColumn(
+        "travel_time_hours",
+        (col("t_indo").cast("long") - col("t_hormuz").cast("long")) / 3600
+    )
 )
 
-# Filter hanya segmen di Hormuz
-df_hormuz_only = df_agg.filter(F.col("polygon_name") == "Selat Hormuz")
-print(f"Total event lewat Hormuz: {df_hormuz_only.count():,}")
+# ── Step 8: Join metadata kapal → simpan ─────────────────────────────────────
 
-# ── Step 7: Simpan hasil ──────────────────────────────────────────────────────
+vessel_meta = (
+    df_ais
+    .select("mmsi", "vessel_type", "flag_country", "draught")
+    .dropDuplicates(["mmsi"])
+)
 
-print(f"Menyimpan ke {OUT_PATH}...")
-df_hormuz_only.write.mode("overwrite").parquet(OUT_PATH)
+df_result = (
+    result
+    .join(vessel_meta, "mmsi")
+    .select(
+        "mmsi", "vessel_type", "flag_country", "draught",
+        "t_hormuz", "t_indo", "travel_time_hours",
+    )
+)
+
+print(f"Total kapal dengan time travel terdeteksi: {df_result.count():,}")
+
+print(f"Menyimpan ke {OUT_TIME_TRAVEL}...")
+df_result.write.mode("overwrite").parquet(OUT_TIME_TRAVEL)
 print("Time travel selesai.")
