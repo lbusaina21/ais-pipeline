@@ -75,6 +75,7 @@ pip install -q --no-deps \
     "git+ssh://git@code.officialstatistics.org/trade-task-team-phase-1/ais.git@emr-migration"
 pip install h3==3.7.7
 pip install -q rapidfuzz h3==3.7.7 geodatasets pyodbc sqlalchemy
+pip install --upgrade --no-cache-dir ./ais_aoi_integrated
 log "Dependencies selesai."
 
 # ── 3. Jalankan pipeline ──────────────────────────────────────────────────────

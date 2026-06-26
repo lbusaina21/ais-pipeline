@@ -15,39 +15,44 @@ from datetime import datetime, timedelta
 
 # ── Periode data ──────────────────────────────────────────────────────────────
 
+END_ACCUM_DATE = datetime.fromisoformat(
+    os.environ.get("PIPELINE_END_DATE",
+                   (datetime.now() - timedelta(days=10)).strftime("%Y-%m-%d"))
+)
 START_DATE = datetime.fromisoformat(
     os.environ.get("PIPELINE_START_DATE",
-                   (datetime.now() - timedelta(days=7)).strftime("%Y-%m-%d"))
+                   (datetime.now() - timedelta(days=9)).strftime("%Y-%m-%d"))
 )
 END_DATE = datetime.fromisoformat(
     os.environ.get("PIPELINE_END_DATE",
-                   datetime.now().strftime("%Y-%m-%d"))
+                   (datetime.now() - timedelta(days=3)).strftime("%Y-%m-%d"))
 )
 
-start_str = START_DATE.strftime("%d%b%Y").lower()   # contoh: 18jun2026
-end_str   = END_DATE.strftime("%d%b%Y").lower()     # contoh: 24jun2026
+end_accum_str   = END_ACCUM_DATE.strftime("%d%b%Y").lower()
+start_str = START_DATE.strftime("%d%b%Y").lower()
+end_str   = END_DATE.strftime("%d%b%Y").lower()
 
 # ── S3 paths ──────────────────────────────────────────────────────────────────
 
 working_dir = os.environ["AWS_WORKING_DIRECTORY_PATH"]
-SAVE_PATH   = f"s3a://{working_dir}ais-indonesia/"
+SAVE_PATH   = f"s3a://{working_dir}iran_usa_conflict/"
 
 # Input/output tiap stage
-IN_RAW     = f"{SAVE_PATH}raw/data-ais-indonesia-{start_str}-{end_str}.parquet"
-OUT_DETAIL = f"{SAVE_PATH}clean/data-ais-indonesia-by-mmsi-detail-{start_str}-{end_str}.parquet"
+IN_RAW     = f"{SAVE_PATH}data-ais-indonesia-by-mmsi-{start_str}-{end_str}.parquet"
+OUT_DETAIL = f"{SAVE_PATH}data-ais-indonesia-by-mmsi-detail-{start_str}-{end_str}.parquet"
 
 # Akumulatif
 ACCUM_START   = os.environ.get("PIPELINE_ACCUM_START", start_str)
-PREV_ACCUM    = os.environ.get("PIPELINE_PREV_ACCUM_PATH", "")
-OUT_ACCUM     = f"{SAVE_PATH}clean/data-ais-indonesia-by-mmsi-detail-{ACCUM_START}-{end_str}.parquet"
+PREV_ACCUM   = f"{SAVE_PATH}data-ais-indonesia-by-mmsi-detail-{ACCUM_START}-{end_accum_str}.parquet"
+OUT_ACCUM     = f"{SAVE_PATH}data-ais-indonesia-by-mmsi-detail-{ACCUM_START}-{end_str}.parquet"
 
 # Hasil analisis
-OUT_PORT_TRAFFIC  = f"{SAVE_PATH}hasil/port_traffic_{start_str}_{end_str}.parquet"
-OUT_PORT_CALL     = f"{SAVE_PATH}hasil/port_call_{start_str}_{end_str}.parquet"
-OUT_TIME_TRAVEL   = f"{SAVE_PATH}hasil/time_travel_hormuz_{start_str}_{end_str}.parquet"
+OUT_PORT_TRAFFIC  = f"{SAVE_PATH}hasil/port_traffic_{ACCUM_START}_{end_str}.parquet"
+OUT_PORT_CALL     = f"{SAVE_PATH}hasil/port_call_{ACCUM_START}_{end_str}.parquet"
+OUT_TIME_TRAVEL   = f"{SAVE_PATH}hasil/time_travel_hormuz_{ACCUM_START}_{end_str}.parquet"
 
 # Referensi statis
-REF_PORT      = f"{SAVE_PATH}ref/port_indonesia_manual.parquet"
+# REF_PORT      = f"{SAVE_PATH}ref/port_indonesia_manual.parquet"
 
 # ── Konstanta ─────────────────────────────────────────────────────────────────
 
@@ -79,7 +84,7 @@ SELECT_COLS = [
 ]
 
 # SQL Server BPS
-SQL_SERVER   = os.environ.get("BPS_SQLSERVER_HOST", "sqlserver.bps.go.id")
-SQL_DATABASE = os.environ.get("BPS_SQLSERVER_DB",   "ais_maritim")
+SQL_SERVER   = os.environ.get("BPS_SQLSERVER_HOST", "NOVA.ms.bps.go.id")
+SQL_DATABASE = os.environ.get("BPS_SQLSERVER_DB",   "sd_web_scraping")
 SQL_USERNAME = os.environ.get("BPS_SQLSERVER_USER")
 SQL_PASSWORD = os.environ.get("BPS_SQLSERVER_PASS")

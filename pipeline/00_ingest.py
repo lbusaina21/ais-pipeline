@@ -7,38 +7,22 @@ Ingest data AIS Indonesia dari S3 UNGP:
   4. Simpan ke S3 personal (landing zone)
 """
 
-import os
-from datetime import datetime, timedelta
+import sys
+sys.path.append("/home/onyxia/work/ais-pipeline")
 
-import geopandas as gpd
 import h3
+import geopandas as gpd
 from pyspark.sql import SparkSession
 from ais import functions as af
 
-# ── Konfigurasi ───────────────────────────────────────────────────────────────
-
-# Rentang tanggal: default 1 minggu terakhir
-# Bisa di-override via environment variable untuk backfill
-START_DATE = datetime.fromisoformat(
-    os.environ.get("PIPELINE_START_DATE",
-                   (datetime.now() - timedelta(days=9)).strftime("%Y-%m-%d"))
-)
-END_DATE = datetime.fromisoformat(
-    os.environ.get("PIPELINE_END_DATE",
-                   (datetime.now() - timedelta(days=3)).strftime("%Y-%m-%d"))
-)
-
-working_dir   = os.environ["AWS_WORKING_DIRECTORY_PATH"]
-SAVE_PATH     = f"s3a://{working_dir}iran_usa_conflict/"
-H3_RESOLUTION = 5
-
-print(f"Periode: {START_DATE.date()} s/d {END_DATE.date()}")
-print(f"Output: {SAVE_PATH}")
+from config import START_DATE, END_DATE, SAVE_PATH, IN_RAW, H3_RESOLUTION_EEZ
 
 # ── Spark session ─────────────────────────────────────────────────────────────
 
 spark = SparkSession.builder.getOrCreate()
 print(f"Spark Connect: {spark.version}")
+print(f"Periode: {START_DATE.date()} s/d {END_DATE.date()}")
+print(f"Output: {IN_RAW}")
 
 # ── Step 1: Polyfill H3 pada EEZ Indonesia ───────────────────────────────────
 
@@ -48,12 +32,12 @@ land_eez = gpd.read_file(
 )
 indo_eez = land_eez[land_eez["TERRITORY1"] == "Indonesia"]
 
-print(f"Polyfill H3 resolusi {H3_RESOLUTION}...")
+print(f"Polyfill H3 resolusi {H3_RESOLUTION_EEZ}...")
 h3_indeces_int = []
 for _, row in indo_eez.iterrows():
-    geom = row.geometry.__geo_interface__
-    h3_cells = h3.polyfill(geom, H3_RESOLUTION, geo_json_conformant=True)
-    h3_indeces_int.extend([h3.string_to_h3(c) for c in h3_cells])
+    geom   = row.geometry.__geo_interface__
+    cells  = h3.polyfill(geom, H3_RESOLUTION_EEZ, geo_json_conformant=True)
+    h3_indeces_int.extend([h3.string_to_h3(c) for c in cells])
 
 h3_indeces_int = list(set(h3_indeces_int))
 print(f"Total H3 cells: {len(h3_indeces_int):,}")
@@ -68,8 +52,7 @@ ais_h3 = af.get_ais(
     h3_list=h3_indeces_int,
 )
 
-unique_mmsi_df   = ais_h3.select("mmsi").distinct()
-unique_mmsi_list = [row["mmsi"] for row in unique_mmsi_df.collect()]
+unique_mmsi_list = [row["mmsi"] for row in ais_h3.select("mmsi").distinct().collect()]
 print(f"MMSI unik ditemukan: {len(unique_mmsi_list):,}")
 
 # ── Step 3: get_ais by MMSI → data lengkap ───────────────────────────────────
@@ -81,20 +64,10 @@ data_ais = af.get_ais(
     end_date=END_DATE,
     mmsi_list=unique_mmsi_list,
 )
-row_count = data_ais.count()
-print(f"Total baris data AIS: {row_count:,}")
+print(f"Total baris data AIS: {data_ais.count():,}")
 
 # ── Step 4: Simpan ke S3 personal ────────────────────────────────────────────
 
-start_str = START_DATE.strftime("%d%b%Y").lower()
-end_str   = END_DATE.strftime("%d%b%Y").lower()
-out_path  = f"{SAVE_PATH}data-ais-indonesia-by-mmsi-{start_str}-{end_str}.parquet"
-
-print(f"Menyimpan ke {out_path}...")
-(
-    data_ais
-    .write
-    .mode("overwrite")
-    .parquet(out_path)
-)
+print(f"Menyimpan ke {IN_RAW}...")
+data_ais.write.mode("overwrite").parquet(IN_RAW)
 print("Ingest selesai.")
