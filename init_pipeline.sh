@@ -7,8 +7,8 @@ set -euo pipefail
 
 REPO_URL="https://github.com/lbusaina21/ais-pipeline.git"
 BRANCH="main"
-WORK_DIR="/home/onyxia/work"
-ONYXIA_API="https://datalab.officialstatistics.org"
+WORK_DIR="/home/onyxia/work/ais-pipeline"
+ONYXIA_API="https://datalab.officialstatistics.org/api"
 LOG_FILE="/home/onyxia/work/pipeline.log"
 
 # Ambil info dari environment variable yang di-inject Onyxia
@@ -22,10 +22,6 @@ log() {
 write_sentinel() {
     local status=$1
     local message=$2
-    local key="${WORKING_DIR}pipeline_status/${status}"
-
-    echo "$message" | aws s3 cp - "s3://${key}" \
-        --endpoint-url "${AWS_S3_ENDPOINT:-}" 2>/dev/null || \
     python3 -c "
 import boto3, os
 s3 = boto3.client('s3')
@@ -45,22 +41,22 @@ self_destruct() {
     if [ -n "$SERVICE_ID" ]; then
         log "Self-destruct: menghapus service $SERVICE_ID..."
         curl -s -X DELETE \
-            "${ONYXIA_API}/my-services/${SERVICE_ID}" \
+            "${ONYXIA_API}/my-lab/services/${SERVICE_ID}" \
             -H "Authorization: Bearer ${VAULT_TOKEN}" || true
     else
         log "SERVICE_ID tidak tersedia, skip self-destruct."
     fi
 }
 
-# ── Trap error — tulis sentinel ERROR lalu self-destruct ─────────────────────
-trap 'log "ERROR di baris $LINENO"; write_sentinel "ERROR" "Gagal di baris $LINENO. Lihat log: $LOG_FILE"; self_destruct' ERR
+# ── Trap error ────────────────────────────────────────────────────────────────
+trap 'log "ERROR di baris $LINENO"; write_sentinel "ERROR" "Gagal di baris $LINENO. Lihat log."; self_destruct' ERR
 
 log "=========================================="
 log "Pipeline AIS Indonesia dimulai"
 log "=========================================="
 
 # ── 1. Clone repo ─────────────────────────────────────────────────────────────
-log "Clone repo dari GitLab..."
+log "Clone repo dari GitHub..."
 if [ -d "$WORK_DIR" ]; then
     cd "$WORK_DIR" && git pull origin "$BRANCH"
 else
@@ -70,12 +66,19 @@ cd "$WORK_DIR"
 log "Repo siap di $WORK_DIR"
 
 # ── 2. Install dependencies ───────────────────────────────────────────────────
-log "Install dependencies..."
+log "Install ODBC Driver 17 for SQL Server..."
+curl -sSL https://packages.microsoft.com/keys/microsoft.asc | apt-key add - 2>/dev/null
+curl -sSL https://packages.microsoft.com/config/debian/11/prod.list \
+    > /etc/apt/sources.list.d/mssql-release.list
+apt-get update -qq
+ACCEPT_EULA=Y apt-get install -y -qq msodbcsql17 unixodbc-dev
+log "ODBC Driver selesai."
+
+log "Install Python dependencies..."
 pip install -q --no-deps \
     "git+ssh://git@code.officialstatistics.org/trade-task-team-phase-1/ais.git@emr-migration"
-pip install h3==3.7.7
-pip install -q rapidfuzz h3==3.7.7 geodatasets pyodbc sqlalchemy
-pip install --upgrade --no-cache-dir ./ais_aoi_integrated
+pip install -q h3==3.7.7 rapidfuzz geodatasets pyodbc sqlalchemy boto3
+pip install -q --upgrade --no-cache-dir ./ais_aoi_integrated
 log "Dependencies selesai."
 
 # ── 3. Jalankan pipeline ──────────────────────────────────────────────────────
