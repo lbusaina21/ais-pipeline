@@ -1,6 +1,6 @@
 """
 pipeline/05_load_sqlserver.py
-Load Hasil analisis AIS ke SQL Server
+Load semua hasil analisis ke SQL Server BPS on-prem.
 """
 
 import sys
@@ -13,7 +13,6 @@ from datetime import datetime
 from sqlalchemy import create_engine, text
 
 from config import (
-    START_DATE, END_DATE,
     OUT_TRAFFIC_ALL, OUT_TRAFFIC_INBOUND, OUT_TRAFFIC_OUTBOUND,
     OUT_VESSEL_HORMUZ, OUT_VESSEL_NO_HORMUZ, OUT_ARRIVAL_RECAP,
     OUT_TIME_TRAVEL,
@@ -72,16 +71,11 @@ for s3_path, table_name in TABLES.items():
 
     try:
         df = read_parquet_s3(s3_path)
-        df["pipeline_start_date"] = START_DATE.date()
-        df["pipeline_end_date"]   = END_DATE.date()
-        df["loaded_at"]           = datetime.now()
+        df["loaded_at"] = datetime.now()
 
+        # Truncate tabel dulu, lalu insert ulang dari awal
         with engine.connect() as conn:
-            conn.execute(text(f"""
-                DELETE FROM {table_name}
-                WHERE pipeline_start_date = :start
-                  AND pipeline_end_date   = :end
-            """), {"start": START_DATE.date(), "end": END_DATE.date()})
+            conn.execute(text(f"TRUNCATE TABLE {table_name}"))
             conn.commit()
 
         df.to_sql(

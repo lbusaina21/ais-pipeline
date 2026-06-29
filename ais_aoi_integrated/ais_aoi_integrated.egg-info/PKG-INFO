@@ -1,0 +1,23 @@
+Metadata-Version: 2.4
+Name: ais_aoi_integrated
+Version: 0.1.9
+Summary: Utilities for working with Indonesian AIS and geospatial H3 data
+Author: Gery Nastiar
+Classifier: Programming Language :: Python :: 3
+Classifier: Operating System :: OS Independent
+Requires-Python: >=3.8
+Requires-Dist: pyspark>=3.3.0
+Requires-Dist: pytest
+Requires-Dist: geopandas
+Requires-Dist: shapely
+Requires-Dist: folium
+Requires-Dist: h3==3.7.7
+Requires-Dist: sedona
+Requires-Dist: apache-sedona
+Requires-Dist: spark
+Requires-Dist: IPython
+Dynamic: author
+Dynamic: classifier
+Dynamic: requires-dist
+Dynamic: requires-python
+Dynamic: summary

@@ -31,7 +31,9 @@ from ais_aoi_integrated.utils import (
     list_vessel_not_through_hormuz,
 )
 
-from config import REF_POLYGON_HORMUZ, OUT_ACCUM, OUT_HORMUZ_TAG, MISSING_COLS, OUT_VESSEL_HORMUZ, OUT_VESSEL_NO_HORMUZ, OUT_ARRIVAL_RECAP
+from config import (
+    REF_POLYGON_HORMUZ, OUT_ACCUM, OUT_HORMUZ_TAG, MISSING_COLS, OUT_VESSEL_HORMUZ, OUT_VESSEL_NO_HORMUZ, OUT_ARRIVAL_RECAP
+)
 
 POLYGON_HORMUZ = Polygon(REF_POLYGON_HORMUZ)
 
@@ -64,7 +66,7 @@ print("Boundary selesai.")
 # ── Step 3: Tag kapal yang lewat Selat Hormuz ─────────────────────────────────
 
 print("Tagging kapal yang melewati Selat Hormuz...")
-h3_set_hormuz = {h3.string_to_h3(x) for x in polygon_to_h3(POLYGON_HORMUZ, 8)}
+h3_set_hormuz = set(polygon_to_h3(POLYGON_HORMUZ, 8))
 
 h3_hormuz_df = (
     spark.createDataFrame([(int(x),) for x in h3_set_hormuz], ["H3_int_index_8"])

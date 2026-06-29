@@ -22,7 +22,9 @@ from pyspark.sql.functions import col, when, split, count
 from pyspark.sql.types import StructType, StructField, DoubleType
 import h3
 
-from config import OUT_ACCUM, REF_PORT_INDO, REF_PORT_LN, OUT_TRAFFIC_ALL, OUT_TRAFFIC_INBOUND, OUT_TRAFFIC_OUTBOUND
+from config import (
+    OUT_ACCUM, REF_PORT_INDO, REF_PORT_LN, OUT_TRAFFIC_ALL, OUT_TRAFFIC_INBOUND, OUT_TRAFFIC_OUTBOUND
+)
 
 # ── Spark session ─────────────────────────────────────────────────────────────
 
@@ -81,7 +83,7 @@ result_df = (
 print("Sortir dan deduplikasi port berurutan...")
 sorted_df = result_df.orderBy("mmsi", "dt_pos_utc")
 
-window_spec = Window().orderBy("mmsi", "dt_pos_utc")
+window_spec = Window.partitionBy("mmsi").orderBy("dt_pos_utc")
 df_with_lag = sorted_df.withColumn("lag_portcountry", F.lag("Port_Country").over(window_spec))
 df_final    = (
     df_with_lag

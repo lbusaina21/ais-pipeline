@@ -17,15 +17,15 @@ from datetime import datetime, timedelta
 
 END_ACCUM_DATE = datetime.fromisoformat(
     os.environ.get("PIPELINE_END_DATE",
-                   (datetime.now() - timedelta(days=10)).strftime("%Y-%m-%d"))
+                   (datetime.now() - timedelta(days=11)).strftime("%Y-%m-%d"))
 )
 START_DATE = datetime.fromisoformat(
     os.environ.get("PIPELINE_START_DATE",
-                   (datetime.now() - timedelta(days=9)).strftime("%Y-%m-%d"))
+                   (datetime.now() - timedelta(days=10)).strftime("%Y-%m-%d"))
 )
 END_DATE = datetime.fromisoformat(
     os.environ.get("PIPELINE_END_DATE",
-                   (datetime.now() - timedelta(days=3)).strftime("%Y-%m-%d"))
+                   (datetime.now() - timedelta(days=7)).strftime("%Y-%m-%d"))
 )
 
 end_accum_str   = END_ACCUM_DATE.strftime("%d%b%Y").lower()
@@ -86,7 +86,7 @@ SELECT_COLS = [
     "GroupBeneficialOwnerCountryofDomicile",
     "length", "LengthOverallLOA", "width", "BreadthExtreme", "Depth", "draught",
     "GrossTonnage", "NetTonnage", "Deadweight", "LightDisplacementTonnage",
-    "nav_status", "heading", "sog",
+    "nav_status", "sog",
     "dt_pos_utc", "latitude", "longitude", "H3_int_index_8",
 ]
 

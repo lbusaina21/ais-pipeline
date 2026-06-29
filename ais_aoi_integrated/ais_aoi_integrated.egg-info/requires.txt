@@ -1,0 +1,10 @@
+pyspark>=3.3.0
+pytest
+geopandas
+shapely
+folium
+h3==3.7.7
+sedona
+apache-sedona
+spark
+IPython
