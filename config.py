@@ -5,9 +5,7 @@ Semua script pipeline import dari sini.
 
 Environment variables yang bisa di-set di init_pipeline.sh:
   PIPELINE_START_DATE    : format YYYY-MM-DD (default: 7 hari lalu)
-  PIPELINE_END_DATE      : format YYYY-MM-DD (default: hari ini)
-  PIPELINE_ACCUM_START   : format ddmonyyyy  (default: sama dengan start_str)
-  PIPELINE_PREV_ACCUM_PATH: path S3 file akumulatif sebelumnya (default: kosong)
+  PIPELINE_END_DATE      : format YYYY-MM-DD (default: 1 hari lalu)
 """
 
 import os
@@ -17,15 +15,15 @@ from datetime import datetime, timedelta
 
 END_ACCUM_DATE = datetime.fromisoformat(
     os.environ.get("PIPELINE_END_DATE",
-                   (datetime.now() - timedelta(days=11)).strftime("%Y-%m-%d"))
+                   (datetime.now() - timedelta(days=13)).strftime("%Y-%m-%d"))
 )
 START_DATE = datetime.fromisoformat(
     os.environ.get("PIPELINE_START_DATE",
-                   (datetime.now() - timedelta(days=10)).strftime("%Y-%m-%d"))
+                   (datetime.now() - timedelta(days=12)).strftime("%Y-%m-%d"))
 )
 END_DATE = datetime.fromisoformat(
     os.environ.get("PIPELINE_END_DATE",
-                   (datetime.now() - timedelta(days=7)).strftime("%Y-%m-%d"))
+                   (datetime.now() - timedelta(days=1)).strftime("%Y-%m-%d"))
 )
 
 end_accum_str   = END_ACCUM_DATE.strftime("%d%b%Y").lower()
@@ -54,7 +52,7 @@ OUT_HORMUZ_TAG          = f"{SAVE_PATH}hasil/tagging-vessel-hormuz-{ACCUM_START}
 OUT_VESSEL_HORMUZ       = f"{SAVE_PATH}hasil/vessel_through_hormuz_{ACCUM_START}_{end_str}.parquet"
 OUT_VESSEL_NO_HORMUZ    = f"{SAVE_PATH}hasil/vessel_not_through_hormuz_{ACCUM_START}_{end_str}.parquet"
 OUT_ARRIVAL_RECAP       = f"{SAVE_PATH}hasil/arrival_recap_hormuz_{ACCUM_START}_{end_str}.parquet"
-OUT_TIME_TRAVEL         = f"{SAVE_PATH}hasil/time-travel-hormuz-to-indonesia-{start_str}-{end_str}.parquet"
+OUT_TIME_TRAVEL         = f"{SAVE_PATH}hasil/time-travel-hormuz-to-indonesia-{ACCUM_START}-{end_str}.parquet"
 
 # Referensi statis
 REF_EEZ_LAND       = f"/vsicurl/https://github.com/nandyarz/ais/raw/main/land-eez/EEZ_Land_v3_202030.shp"
@@ -103,9 +101,3 @@ MISSING_COLS = [
     "BreadthExtreme", "GrossTonnage", "NetTonnage", "Deadweight",
     "LightDisplacementTonnage", "Depth", "dt_pos_utc",
 ]
-
-# SQL Server BPS
-SQL_SERVER   = os.environ.get("BPS_SQLSERVER_HOST", "NOVA.ms.bps.go.id")
-SQL_DATABASE = os.environ.get("BPS_SQLSERVER_DB",   "sd_web_scraping")
-SQL_USERNAME = os.environ.get("BPS_SQLSERVER_USER")
-SQL_PASSWORD = os.environ.get("BPS_SQLSERVER_PASS")

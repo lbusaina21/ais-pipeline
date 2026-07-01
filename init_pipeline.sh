@@ -107,10 +107,6 @@ wait $PID_CALL    || { log "03_port_call.py GAGAL"; exit 1; }
 wait $PID_TIME    || { log "04_time_travel.py GAGAL"; exit 1; }
 log "--- Selesai: semua analisis paralel ---"
 
-log "--- Mulai: 05_load_sqlserver.py ---"
-python pipeline/05_load_sqlserver.py 2>&1 | tee -a "$LOG_FILE"
-log "--- Selesai: 05_load_sqlserver.py ---"
-
 # ── 4. Tulis sentinel SUCCESS ─────────────────────────────────────────────────
 FINISH_TIME=$(date '+%Y-%m-%d %H:%M:%S')
 write_sentinel "SUCCESS" "Pipeline selesai pada $FINISH_TIME"
